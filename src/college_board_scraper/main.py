@@ -5,13 +5,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.remote.webelement import WebElement # imported for type hint
 from selenium.common.exceptions import ElementClickInterceptedException, StaleElementReferenceException, TimeoutException
+from selenium.webdriver.firefox.options import Options
 from typing import Tuple, Set, Dict, List
 from itertools import chain
 from PIL import Image
 from PIL.PngImagePlugin import PngImageFile # imported for type hint
 from io import BytesIO
 from time import sleep
-from os import mkdir
+from os import makedirs
 from os.path import isdir
 from helpers import ScraperAmount
 
@@ -84,7 +85,9 @@ class Scraper():
 
         self.exclude_active_questions: bool = exclude_active_questions
         
-        self.driver: webdriver.Firefox = webdriver.Firefox()
+        self._firefox_options: Options = Options()
+        self._firefox_options.add_argument("--headless")
+        self.driver: webdriver.Firefox = webdriver.Firefox(options=self._firefox_options)
 
     def _check_if_skills_valid(self: "Scraper", valid_skills: Dict[str, Set[str]]) -> None:
         if not set(self.skills.keys()).issubset(self.options):
@@ -213,14 +216,14 @@ class Scraper():
                 continue
         
         if save_images:
-            if not isdir("questions"):
-                mkdir("questions")
-            if not isdir("answers"):
-                mkdir("answers")
+            if not isdir("src/college_board_scraper/questions"):
+                makedirs("src/college_board_scraper/questions")
+            if not isdir("src/college_board_scraper/answers"):
+                makedirs("src/college_board_scraper/answers")
             
             for i, (question, answer) in questions_and_answers:
-                question.save(f"questions/question-{i}.png")
-                answer.save(f"answers/answer-{i}.png")
+                question.save(f"src/college_board_scraper/questions/question-{i}.png")
+                answer.save(f"src/college_board_scraper/answers/answer-{i}.png")
             
     # Handles all introductory options
     def _go_to_main_page(self: "Scraper") -> None:
@@ -300,4 +303,4 @@ skills: Dict[str, Set[str]] = {
 }
 difficulties = {"Easy", "Medium", "Hard"}
 scraper: Scraper = Scraper(assessment="SAT", test="Math", options=Scraper.valid_math_options, difficulties={"Hard"})
-scraper.scrape(amount=10, save_images=True)
+scraper.scrape(amount=1, save_images=True)
