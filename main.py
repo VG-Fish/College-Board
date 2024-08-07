@@ -95,7 +95,7 @@ class Scraper():
                     f"one of skills value (you inputted {self.skills[option]}) is not a valid subset of: {valid_skills[option]}."
                 )
 
-    def _click_away(self: "Scraper"):
+    def _click_away(self: "Scraper") -> None:
         self.driver.find_element(By.TAG_NAME, 'body').click()
     
     def scrape(self: "Scraper", amount: int = 0) -> None:
@@ -103,18 +103,14 @@ class Scraper():
         self._set_up_main_page()
         self._scrape_main_page(amount)
 
-    def _scrape_question(self: "Scraper", i: int):
+    def _scrape_prompt(self: "Scraper", i: int) -> None:
         div_question_element: WebElement = WebDriverWait(self.driver, 5.0).until(
             EC.presence_of_element_located((By.XPATH, "(//*[@class='question-content col-xs-12 col-md-6'])"))
         )
         # Wait for content to load before taking screenshot. Also to avoid rate limiting.
         sleep(0.1)
 
-        screenshot: bytes = self.driver.get_screenshot_as_png()
-        window_size: Dict[str, int] = self.driver.get_window_size()
-        width: int = window_size["width"]
-        height: int = window_size["height"]
-        image: PngImageFile = Image.open(BytesIO(screenshot)).resize((width, height))
+        image: PngImageFile = self._take_screenshot()
 
         rect: Dict[str, float] = self.driver.execute_script("""
             var element = arguments[0];
@@ -129,6 +125,41 @@ class Scraper():
         padding: float = 20
         image: PngImageFile = image.crop((left - padding, top, right, bottom))
         image.save(f"question-{i}.png")
+
+    def _take_screenshot(self: "Scraper") -> PngImageFile:
+        screenshot: bytes = self.driver.get_screenshot_as_png()
+        window_size: Dict[str, int] = self.driver.get_window_size()
+        width: int = window_size["width"]
+        height: int = window_size["height"]
+        image: PngImageFile = Image.open(BytesIO(screenshot)).resize((width, height))
+        return image
+
+    def _scrape_answer(self: "Scraper", i: int) -> None:
+        # Scroll to bottom of page.
+        modal_container_element = self.driver.find_element(By.XPATH, "(//*[@class='cb-modal-container'])")
+        self.driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", modal_container_element)
+
+        div_answer_element: WebElement = self.driver.find_element(By.XPATH, "(//*[@class='answer-content col-xs-12 col-md-6'])")
+
+        image: PngImageFile = self._take_screenshot()
+
+        rect: Dict[str, float] = self.driver.execute_script("""
+            var element = arguments[0];
+            var rect = element.getBoundingClientRect();
+            return {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height};
+        """, div_answer_element)
+        left: float = rect['left']
+        top: float = rect['top']
+        right: float = rect['right']
+        bottom: float = rect['bottom']
+
+        padding: float = 20
+        image: PngImageFile = image.crop((left - padding, top, right, bottom))
+        image.save(f"answer-{i}.png")
+
+    def _scrape_question(self: "Scraper", i: int) -> None:
+        self._scrape_prompt(i)
+        self._scrape_answer(i)
 
     def _scrape_main_page(self: "Scraper", amount: int = 0) -> None:
         self.driver.implicitly_wait(1.0)
