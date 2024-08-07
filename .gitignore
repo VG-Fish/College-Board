@@ -1,1 +1,3 @@
 src/college_board_scraper/__pycache__/
+src/college_board_scraper/answers/
+src/college_board_scraper/questions/
