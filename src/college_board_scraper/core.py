@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.remote.webelement import WebElement # imported for type hint
 from selenium.common.exceptions import ElementClickInterceptedException, StaleElementReferenceException, TimeoutException
 from selenium.webdriver.firefox.options import Options
-from typing import Tuple, Set, Dict, List
+from typing import Tuple, Set, Dict, List, Optional
 from itertools import chain
 from PIL import Image
 from PIL.PngImagePlugin import PngImageFile # imported for type hint
@@ -104,7 +104,7 @@ class Scraper():
     def _click_away(self: "Scraper") -> None:
         self.driver.find_element(By.TAG_NAME, 'body').click()
     
-    def scrape(self: "Scraper", amount: int | ScraperAmount = 0, save_images: bool = False) -> None:
+    def scrape(self: "Scraper", amount: int | ScraperAmount, save_images: bool = False) -> None:
         self._go_to_main_page()
         self._set_up_main_page()
         self._scrape_main_page(amount, save_images)
@@ -156,8 +156,8 @@ class Scraper():
     def _scrape_question(self: "Scraper", i: int) -> Tuple[PngImageFile, PngImageFile]:
         return (self._scrape_prompt(i), self._scrape_answer(i))
 
-    def _scrape_main_page(self: "Scraper", amount: int | ScraperAmount = 0, save_images: bool = False) -> None:
-        self.driver.implicitly_wait(1.0)
+    def _scrape_main_page(self: "Scraper", amount: int | ScraperAmount = 0, save_images: bool = False) -> Optional[List[Tuple[int, Tuple[PngImageFile, PngImageFile]]]]:
+        self.driver.implicitly_wait(0.5)
         
         div_text_element: WebElement = WebDriverWait(self.driver, 2.0).until(
             EC.visibility_of_element_located((By.XPATH, "(//*[@class='table-header cb-padding-top-24 cb-border-top cb-border-top-2'])"))
@@ -224,6 +224,8 @@ class Scraper():
             for i, (question, answer) in questions_and_answers:
                 question.save(f"src/college_board_scraper/questions/question-{i}.png")
                 answer.save(f"src/college_board_scraper/answers/answer-{i}.png")
+        else:
+            return questions_and_answers
             
     # Handles all introductory options
     def _go_to_main_page(self: "Scraper") -> None:

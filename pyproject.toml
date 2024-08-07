@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "college_board_scraper"
+version = "0.1.0"
+authors = [
+  { name="Vishwesswaran Gopal", email="vishy1290@gmail.com" },
+]
+description = "A package to scrape the CollegeBoard SAT Suite Question Bank webpage."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License (GPL)",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Natural Language :: English",
+    "Topic :: Multimedia :: Graphics",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "selenium"
+]
+license = {file = "LICENSE"}
+keywords = ["scraper", "collegeboard"]
+
+[project.urls]
+Homepage = "https://github.com/VG-Fish/College-Board/"
