@@ -5,8 +5,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.remote.webelement import WebElement # imported for type hint
 from selenium.common.exceptions import ElementClickInterceptedException, StaleElementReferenceException, TimeoutException
-from typing import Tuple, Set, Dict, List
+from typing import Tuple, Set, Dict
 from itertools import chain
+from PIL import Image
+from PIL.PngImagePlugin import PngImageFile # imported for type hint
+from io import BytesIO
 
 class Scraper():
     # Init Page Options
@@ -99,6 +102,31 @@ class Scraper():
         self._set_up_main_page()
         self._scrape_main_page(amount)
 
+    def _scrape_question(self: "Scraper", i: int):
+        self.driver.implicitly_wait(1.0)
+
+        div_question_element: WebElement = self.driver.find_element(By.XPATH, "(//*[@class='question cb-margin-top-16'])")
+        self.driver.execute_script("arguments[0].scrollIntoView();", div_question_element)
+        div_question_element: WebElement = div_question_element.find_element(By.TAG_NAME, "div")
+        p_question_element: WebElement = div_question_element.find_element(By.TAG_NAME, "p")
+
+        location: Dict[str, int] = p_question_element.location
+        size: Dict[str, float] = p_question_element.size
+
+        screenshot: bytes = self.driver.get_screenshot_as_png()
+        image: PngImageFile = Image.open(BytesIO(screenshot))
+        image.save(f"question-{i}-full.png")
+
+        left: int = location['x']
+        top: int = location['y']
+        right: float = location['x'] + size['width']
+        bottom: float = location['y'] + size['height']
+        print(location, size)
+
+        image: PngImageFile = image.crop((left, top, right, bottom))
+        image.save(f"question-{i}.png")
+
+
     def _scrape_main_page(self: "Scraper", amount: int = 0) -> None:
         self.driver.implicitly_wait(1.0)
         
@@ -109,15 +137,15 @@ class Scraper():
         text_element: WebElement = p_text_element.find_element(By.TAG_NAME, "span")
         total_amount_of_buttons: int = int(text_element.get_attribute("innerHTML"))
 
-        # Iterates until range(amount) reaches the end
+        scraped_question: bool = False
         for i in range(1, min(amount, total_amount_of_buttons) + 1):
             try:
-                # Wait for the specific button to be clickable
+                # Wait for the current question button to be clickable
                 element: WebElement = WebDriverWait(self.driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, f"(//*[@class='cb-btn square cb-roboto cb-btn-naked view-question-button'])[{i}]"))
                 )
                 
-                # Attempt to click the button
+                # Attempt to click the current question button
                 try:
                     element.click()
                 except ElementClickInterceptedException:
@@ -130,8 +158,14 @@ class Scraper():
                 close_button: WebElement = WebDriverWait(self.driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, "(//*[@class='cb-btn square cb-roboto cancel-btn cb-btn cb-roboto cb-margin-left-24'])"))
                 )
+                
+                # For some reason, the first time we do _scrape_question, all the content isn't loaded
+                if not scraped_question:
+                    scraped_question = True
+                    self._scrape_question(i)
+                self._scrape_question(i)
 
-                # Click Close Button
+                # Click close button
                 try:
                     close_button.click()
                 except ElementClickInterceptedException:
