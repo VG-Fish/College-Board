@@ -10,6 +10,7 @@ from itertools import chain
 from PIL import Image
 from PIL.PngImagePlugin import PngImageFile # imported for type hint
 from io import BytesIO
+from time import sleep
 
 class Scraper():
     # Init Page Options
@@ -103,29 +104,31 @@ class Scraper():
         self._scrape_main_page(amount)
 
     def _scrape_question(self: "Scraper", i: int):
-        self.driver.implicitly_wait(1.0)
-
-        div_question_element: WebElement = self.driver.find_element(By.XPATH, "(//*[@class='question cb-margin-top-16'])")
-        self.driver.execute_script("arguments[0].scrollIntoView();", div_question_element)
-        div_question_element: WebElement = div_question_element.find_element(By.TAG_NAME, "div")
-        p_question_element: WebElement = div_question_element.find_element(By.TAG_NAME, "p")
-
-        location: Dict[str, int] = p_question_element.location
-        size: Dict[str, float] = p_question_element.size
+        div_question_element: WebElement = WebDriverWait(self.driver, 5.0).until(
+            EC.presence_of_element_located((By.XPATH, "(//*[@class='question-content col-xs-12 col-md-6'])"))
+        )
+        # Wait for content to load before taking screenshot. Also to avoid rate limiting.
+        sleep(0.1)
 
         screenshot: bytes = self.driver.get_screenshot_as_png()
-        image: PngImageFile = Image.open(BytesIO(screenshot))
-        image.save(f"question-{i}-full.png")
+        window_size: Dict[str, int] = self.driver.get_window_size()
+        width: int = window_size["width"]
+        height: int = window_size["height"]
+        image: PngImageFile = Image.open(BytesIO(screenshot)).resize((width, height))
 
-        left: int = location['x']
-        top: int = location['y']
-        right: float = location['x'] + size['width']
-        bottom: float = location['y'] + size['height']
-        print(location, size)
+        rect: Dict[str, float] = self.driver.execute_script("""
+            var element = arguments[0];
+            var rect = element.getBoundingClientRect();
+            return {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height};
+        """, div_question_element)
+        left: float = rect['left']
+        top: float = rect['top']
+        right: float = rect['right']
+        bottom: float = rect['bottom']
 
-        image: PngImageFile = image.crop((left, top, right, bottom))
+        padding: float = 20
+        image: PngImageFile = image.crop((left - padding, top, right, bottom))
         image.save(f"question-{i}.png")
-
 
     def _scrape_main_page(self: "Scraper", amount: int = 0) -> None:
         self.driver.implicitly_wait(1.0)
@@ -159,10 +162,6 @@ class Scraper():
                     EC.element_to_be_clickable((By.XPATH, "(//*[@class='cb-btn square cb-roboto cancel-btn cb-btn cb-roboto cb-margin-left-24'])"))
                 )
                 
-                # For some reason, the first time we do _scrape_question, all the content isn't loaded
-                if not scraped_question:
-                    scraped_question = True
-                    self._scrape_question(i)
                 self._scrape_question(i)
 
                 # Click close button
