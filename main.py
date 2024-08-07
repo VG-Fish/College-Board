@@ -5,6 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.remote.webelement import WebElement # imported for type hint
 from typing import Tuple, Set, Dict
+from itertools import chain
 
 class Scraper():
     # Init Page Options
@@ -15,7 +16,7 @@ class Scraper():
     valid_math_options: Set[str] = {"Algebra", "Advanced Math", "Problem-Solving and Data Analysis", "Geometry and Trigonometry"}
 
     # Main Page options
-    valid_difficulty_options: Tuple[str] = ["Easy", "Medium", "Hard"]
+    valid_difficulty_options: Set[str] = {"Easy", "Medium", "Hard"}
 
     valid_reading_and_writing_skills: Dict[str, Set[str]] = {
         "Information and Ideas": {"Central Ideas and Details", "Inferences", "Command of Evidence"}, 
@@ -42,7 +43,7 @@ class Scraper():
             assessment: str, 
             test: str, 
             options: Set[str],
-            difficulty: str | None = None, 
+            difficulty: Set[str] | None = None, 
             skills: Dict[str, Set[str]] | None = None,
             exclude_active_questions: bool = False
         ) -> None:
@@ -58,13 +59,13 @@ class Scraper():
         if len(self.options) == 0:
             raise ValueError(f"Length of options must not be zero. Add these options: {Scraper.valid_reading_and_writing_options}")
         elif self.test == "Reading and Writing" and not self.options.issubset(Scraper.valid_reading_and_writing_options):
-            raise ValueError(f"options (you inputted {self.options}) must be a valid subset of {Scraper.valid_reading_and_writing_options}.")
+            raise ValueError(f"options (you inputted {self.options}) must be a valid subset of: {Scraper.valid_reading_and_writing_options}.")
         elif self.test == "Math" and not self.options.issubset(Scraper.valid_math_options):
-            raise ValueError(f"options (you inputted {self.options}) must be a valid subset of {Scraper.valid_math_options}.")
+            raise ValueError(f"options (you inputted {self.options}) must be a valid subset of: {Scraper.valid_math_options}.")
 
-        self.difficulty: bool | None = difficulty
-        if difficulty is not None and self.difficulty not in Scraper.valid_difficulty_options:
-            raise ValueError(f"difficulty (you inputted {self.difficulty}) must be one of these three options: {Scraper.valid_difficulty_options}.")
+        self.difficulty: Set[str] | None = difficulty
+        if difficulty is not None and not self.difficulty.issubset(Scraper.valid_difficulty_options):
+            raise ValueError(f"difficulty (you inputted {self.difficulty}) must be a valid subset of: {Scraper.valid_difficulty_options}.")
 
         # Checking if self.skills has valid skills that can all actually be clicked on the website.
         self.skills: Dict[str, Set[str]] = skills
@@ -79,19 +80,19 @@ class Scraper():
 
     def _check_if_skills_valid(self: "Scraper", valid_skills: Dict[str, Set[str]]) -> None:
         if not set(self.skills.keys()).issubset(self.options):
-            raise ValueError(f"skills keys (you inputted {self.skills.keys()}) must be a valid subset of options {self.options}.")
+            raise ValueError(f"skills keys (you inputted {self.skills.keys()}) must be a valid subset of: {self.options}.")
             
         for option in self.options:
             if option not in self.skills:
                 raise ValueError(f"{option} is not found in {self.options}.")
             if not self.skills[option].issubset(valid_skills[option]):
                 raise ValueError(
-                    f"one of skills value (you inputted {self.skills[option]}) is not a valid subset of the options {valid_skills[option]}."
+                    f"one of skills value (you inputted {self.skills[option]}) is not a valid subset of: {valid_skills[option]}."
                 )
 
     def scrape(self: "Scraper") -> None:
         self._go_to_main_page()
-        self._main_page()
+        self._set_up_main_page()
 
     # Handles all introductory options
     def _go_to_main_page(self: "Scraper") -> None:
@@ -117,9 +118,43 @@ class Scraper():
             EC.element_to_be_clickable((By.XPATH, "(//button)[4]"))
         )
         submit_button.click()
-    
-    def _main_page(self: "Scraper") -> None:
-        pass
+
+    def _set_up_main_page(self: "Scraper") -> None:
+        if self.difficulty:
+            difficulty_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
+                EC.element_to_be_clickable((By.ID, "dropdown1"))
+            )
+            difficulty_a_dropdown.click()
+
+            for option in self.difficulty:
+                difficulty_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
+                    EC.element_to_be_clickable((By.ID, option[0]))
+                )
+                difficulty_dropdown.click()
+            
+            # Click on the body to close the dropdown
+            self.driver.find_element(By.TAG_NAME, 'body').click()
+        
+        if self.skills:
+            skills_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
+                EC.element_to_be_clickable((By.ID, "dropdown2"))
+            )
+            skills_a_dropdown.click()
+
+            for skill in chain(*self.skills.values()):
+                option_checkbox: WebElement = WebDriverWait(self.driver, 2.0).until(
+                    EC.element_to_be_clickable((By.ID, skill))
+                )
+                option_checkbox.click()
+            
+            self.driver.find_element(By.TAG_NAME, 'body').click()
+        
+        if self.exclude_active_questions:
+            exclude_action_questions_checkbox: WebElement = WebDriverWait(self.driver, 2.0).until(
+                EC.element_to_be_clickable((By.ID, "apricot_check_4"))
+            )
+            exclude_action_questions_checkbox.click()
+
 
 options: Set[str] = {"Algebra", 'Advanced Math', "Problem-Solving and Data Analysis", "Geometry and Trigonometry"}
 skills: Dict[str, Set[str]] = {
@@ -135,5 +170,5 @@ skills: Dict[str, Set[str]] = {
     }, 
     "Geometry and Trigonometry": {"Area and volume", "Lines, angles, and triangles", "Right triangles and trigonometry", "Circles"}
 }
-scraper: Scraper = Scraper(assessment="SAT", test="Math", options=options, skills=skills)
+scraper: Scraper = Scraper(assessment="SAT", test="Math", options=options, skills=skills, difficulty={"Easy", "Medium", "Hard"})
 scraper.scrape()
