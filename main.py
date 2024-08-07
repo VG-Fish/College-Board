@@ -5,12 +5,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.remote.webelement import WebElement # imported for type hint
 from selenium.common.exceptions import ElementClickInterceptedException, StaleElementReferenceException, TimeoutException
-from typing import Tuple, Set, Dict
+from typing import Tuple, Set, Dict, List
 from itertools import chain
 from PIL import Image
 from PIL.PngImagePlugin import PngImageFile # imported for type hint
 from io import BytesIO
 from time import sleep
+from os import mkdir
+from os.path import isdir
+from helpers import ScraperAmount
 
 class Scraper():
     # Init Page Options
@@ -48,7 +51,7 @@ class Scraper():
             assessment: str, 
             test: str, 
             options: Set[str],
-            difficulty: Set[str] | None = None, 
+            difficulties: Set[str] | None = None, 
             skills: Dict[str, Set[str]] | None = None,
             exclude_active_questions: bool = False
         ) -> None:
@@ -68,9 +71,9 @@ class Scraper():
         elif self.test == "Math" and not self.options.issubset(Scraper.valid_math_options):
             raise ValueError(f"options (you inputted {self.options}) must be a valid subset of: {Scraper.valid_math_options}.")
 
-        self.difficulty: Set[str] | None = difficulty
-        if difficulty is not None and not self.difficulty.issubset(Scraper.valid_difficulty_options):
-            raise ValueError(f"difficulty (you inputted {self.difficulty}) must be a valid subset of: {Scraper.valid_difficulty_options}.")
+        self.difficulties: Set[str] | None = difficulties
+        if difficulties is not None and not self.difficulties.issubset(Scraper.valid_difficulty_options):
+            raise ValueError(f"difficulties (you inputted {self.difficulties}) must be a valid subset of: {Scraper.valid_difficulty_options}.")
 
         # Checking if self.skills has valid skills that can all actually be clicked on the website.
         self.skills: Dict[str, Set[str]] = skills
@@ -98,10 +101,11 @@ class Scraper():
     def _click_away(self: "Scraper") -> None:
         self.driver.find_element(By.TAG_NAME, 'body').click()
     
-    def scrape(self: "Scraper", amount: int = 0) -> None:
+    def scrape(self: "Scraper", amount: int | ScraperAmount = 0, save_images: bool = False) -> None:
         self._go_to_main_page()
         self._set_up_main_page()
-        self._scrape_main_page(amount)
+        self._scrape_main_page(amount, save_images)
+        self.driver.quit()
 
     def _scrape_prompt(self: "Scraper", i: int) -> None:
         div_question_element: WebElement = WebDriverWait(self.driver, 5.0).until(
@@ -111,20 +115,7 @@ class Scraper():
         sleep(0.1)
 
         image: PngImageFile = self._take_screenshot()
-
-        rect: Dict[str, float] = self.driver.execute_script("""
-            var element = arguments[0];
-            var rect = element.getBoundingClientRect();
-            return {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height};
-        """, div_question_element)
-        left: float = rect['left']
-        top: float = rect['top']
-        right: float = rect['right']
-        bottom: float = rect['bottom']
-
-        padding: float = 20
-        image: PngImageFile = image.crop((left - padding, top, right, bottom))
-        image.save(f"question-{i}.png")
+        return self._take_content_screenshot(div_question_element, image)
 
     def _take_screenshot(self: "Scraper") -> PngImageFile:
         screenshot: bytes = self.driver.get_screenshot_as_png()
@@ -142,12 +133,14 @@ class Scraper():
         div_answer_element: WebElement = self.driver.find_element(By.XPATH, "(//*[@class='answer-content col-xs-12 col-md-6'])")
 
         image: PngImageFile = self._take_screenshot()
+        return self._take_content_screenshot(div_answer_element, image)
 
+    def _take_content_screenshot(self: "Scraper", div_element: WebElement, image: PngImageFile):
         rect: Dict[str, float] = self.driver.execute_script("""
             var element = arguments[0];
             var rect = element.getBoundingClientRect();
             return {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height};
-        """, div_answer_element)
+        """, div_element)
         left: float = rect['left']
         top: float = rect['top']
         right: float = rect['right']
@@ -155,13 +148,12 @@ class Scraper():
 
         padding: float = 20
         image: PngImageFile = image.crop((left - padding, top, right, bottom))
-        image.save(f"answer-{i}.png")
+        return image
 
-    def _scrape_question(self: "Scraper", i: int) -> None:
-        self._scrape_prompt(i)
-        self._scrape_answer(i)
+    def _scrape_question(self: "Scraper", i: int) -> Tuple[PngImageFile, PngImageFile]:
+        return (self._scrape_prompt(i), self._scrape_answer(i))
 
-    def _scrape_main_page(self: "Scraper", amount: int = 0) -> None:
+    def _scrape_main_page(self: "Scraper", amount: int | ScraperAmount = 0, save_images: bool = False) -> None:
         self.driver.implicitly_wait(1.0)
         
         div_text_element: WebElement = WebDriverWait(self.driver, 2.0).until(
@@ -171,7 +163,13 @@ class Scraper():
         text_element: WebElement = p_text_element.find_element(By.TAG_NAME, "span")
         total_amount_of_buttons: int = int(text_element.get_attribute("innerHTML"))
 
-        scraped_question: bool = False
+        if isinstance(amount, ScraperAmount):
+            if amount == ScraperAmount.ALL:
+                amount = total_amount_of_buttons
+            elif amount == ScraperAmount.RANDOM:
+                raise NotImplementedError("NOT IMPLEMENTED YET!")
+
+        questions_and_answers: List[Tuple[int, Tuple[PngImageFile, PngImageFile]]] = []
         for i in range(1, min(amount, total_amount_of_buttons) + 1):
             try:
                 # Wait for the current question button to be clickable
@@ -193,7 +191,7 @@ class Scraper():
                     EC.element_to_be_clickable((By.XPATH, "(//*[@class='cb-btn square cb-roboto cancel-btn cb-btn cb-roboto cb-margin-left-24'])"))
                 )
                 
-                self._scrape_question(i)
+                questions_and_answers.append((i, self._scrape_question(i)))
 
                 # Click close button
                 try:
@@ -213,8 +211,17 @@ class Scraper():
             except (TimeoutException, StaleElementReferenceException) as e:
                 print(f"Error processing button {i}: {str(e)}")
                 continue
+        
+        if save_images:
+            if not isdir("questions"):
+                mkdir("questions")
+            if not isdir("answers"):
+                mkdir("answers")
             
-
+            for i, (question, answer) in questions_and_answers:
+                question.save(f"questions/question-{i}.png")
+                answer.save(f"answers/answer-{i}.png")
+            
     # Handles all introductory options
     def _go_to_main_page(self: "Scraper") -> None:
         self.driver.get("https://satsuitequestionbank.collegeboard.org/digital/search")
@@ -242,13 +249,13 @@ class Scraper():
 
     # Clicks all main page options
     def _set_up_main_page(self: "Scraper") -> None:
-        if self.difficulty:
-            difficulty_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
+        if self.difficulties:
+            difficulties_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
                 EC.element_to_be_clickable((By.ID, "dropdown1"))
             )
-            difficulty_a_dropdown.click()
+            difficulties_a_dropdown.click()
 
-            for option in self.difficulty:
+            for option in self.difficulties:
                 difficulty_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
                     EC.element_to_be_clickable((By.ID, option[0]))
                 )
@@ -291,5 +298,6 @@ skills: Dict[str, Set[str]] = {
     }, 
     "Geometry and Trigonometry": {"Area and volume", "Lines, angles, and triangles", "Right triangles and trigonometry", "Circles"}
 }
-scraper: Scraper = Scraper(assessment="SAT", test="Math", options=options)
-scraper.scrape(10)
+difficulties = {"Easy", "Medium", "Hard"}
+scraper: Scraper = Scraper(assessment="SAT", test="Math", options=Scraper.valid_math_options, difficulties={"Hard"})
+scraper.scrape(amount=10, save_images=True)
