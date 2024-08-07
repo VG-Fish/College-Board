@@ -4,7 +4,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.remote.webelement import WebElement # imported for type hint
-from typing import Tuple, Set, Dict
+from selenium.common.exceptions import ElementClickInterceptedException, StaleElementReferenceException, TimeoutException
+from typing import Tuple, Set, Dict, List
 from itertools import chain
 
 class Scraper():
@@ -90,15 +91,71 @@ class Scraper():
                     f"one of skills value (you inputted {self.skills[option]}) is not a valid subset of: {valid_skills[option]}."
                 )
 
-    def scrape(self: "Scraper") -> None:
+    def _click_away(self: "Scraper"):
+        self.driver.find_element(By.TAG_NAME, 'body').click()
+    
+    def scrape(self: "Scraper", amount: int = 0) -> None:
         self._go_to_main_page()
         self._set_up_main_page()
+        self._scrape_main_page(amount)
+
+    def _scrape_main_page(self: "Scraper", amount: int = 0) -> None:
+        self.driver.implicitly_wait(1.0)
+        
+        div_text_element: WebElement = WebDriverWait(self.driver, 2.0).until(
+            EC.visibility_of_element_located((By.XPATH, "(//*[@class='table-header cb-padding-top-24 cb-border-top cb-border-top-2'])"))
+        )
+        p_text_element: WebElement = div_text_element.find_element(By.TAG_NAME, "p")
+        text_element: WebElement = p_text_element.find_element(By.TAG_NAME, "span")
+        total_amount_of_buttons: int = int(text_element.get_attribute("innerHTML"))
+
+        # Iterates until range(amount) reaches the end
+        for i in range(1, min(amount, total_amount_of_buttons) + 1):
+            try:
+                # Wait for the specific button to be clickable
+                element: WebElement = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, f"(//*[@class='cb-btn square cb-roboto cb-btn-naked view-question-button'])[{i}]"))
+                )
+                
+                # Attempt to click the button
+                try:
+                    element.click()
+                except ElementClickInterceptedException:
+                    # If the overlay is present, wait for it to disappear
+                    WebDriverWait(self.driver, 10.0).until(
+                        EC.invisibility_of_element_located((By.CLASS_NAME, "cb-modal-overlay"))
+                    )
+                    element.click()
+                
+                close_button: WebElement = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "(//*[@class='cb-btn square cb-roboto cancel-btn cb-btn cb-roboto cb-margin-left-24'])"))
+                )
+
+                # Click Close Button
+                try:
+                    close_button.click()
+                except ElementClickInterceptedException:
+                    # If the overlay is present, wait for it to disappear
+                    WebDriverWait(self.driver, 10.0).until(
+                        EC.invisibility_of_element_located((By.CLASS_NAME, "cb-modal-overlay"))
+                    )
+                    close_button.click()
+                
+                # Wait for any animations or page changes to complete
+                WebDriverWait(self.driver, 10.0).until(
+                    EC.staleness_of(close_button)
+                )
+            
+            except (TimeoutException, StaleElementReferenceException) as e:
+                print(f"Error processing button {i}: {str(e)}")
+                continue
+            
 
     # Handles all introductory options
     def _go_to_main_page(self: "Scraper") -> None:
         self.driver.get("https://satsuitequestionbank.collegeboard.org/digital/search")
 
-        search_assessment_element: Select = Select(WebDriverWait(self.driver, 2.0).until(
+        search_assessment_element: Select = Select(WebDriverWait(self.driver, 5.0).until(
             EC.presence_of_element_located((By.ID, "selectAssessmentType"))
         ))
         search_assessment_element.select_by_visible_text(self.assessment)
@@ -119,6 +176,7 @@ class Scraper():
         )
         submit_button.click()
 
+    # Clicks all main page options
     def _set_up_main_page(self: "Scraper") -> None:
         if self.difficulty:
             difficulty_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
@@ -133,7 +191,7 @@ class Scraper():
                 difficulty_dropdown.click()
             
             # Click on the body to close the dropdown
-            self.driver.find_element(By.TAG_NAME, 'body').click()
+            self._click_away()
         
         if self.skills:
             skills_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
@@ -147,14 +205,13 @@ class Scraper():
                 )
                 option_checkbox.click()
             
-            self.driver.find_element(By.TAG_NAME, 'body').click()
+            self._click_away()
         
         if self.exclude_active_questions:
             exclude_action_questions_checkbox: WebElement = WebDriverWait(self.driver, 2.0).until(
                 EC.element_to_be_clickable((By.ID, "apricot_check_4"))
             )
             exclude_action_questions_checkbox.click()
-
 
 options: Set[str] = {"Algebra", 'Advanced Math', "Problem-Solving and Data Analysis", "Geometry and Trigonometry"}
 skills: Dict[str, Set[str]] = {
@@ -170,5 +227,5 @@ skills: Dict[str, Set[str]] = {
     }, 
     "Geometry and Trigonometry": {"Area and volume", "Lines, angles, and triangles", "Right triangles and trigonometry", "Circles"}
 }
-scraper: Scraper = Scraper(assessment="SAT", test="Math", options=options, skills=skills, difficulty={"Easy", "Medium", "Hard"})
-scraper.scrape()
+scraper: Scraper = Scraper(assessment="SAT", test="Math", options=options)
+scraper.scrape(10)
