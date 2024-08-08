@@ -1,6 +1,7 @@
 # A Python Library to scrape CollegeBoard
 ## Things to Note: 
 - This is the website being scraped: [CollegeBoard SAT Suite Question Bank](https://satsuitequestionbank.collegeboard.org/digital/search)
+- [PyPi Page](https://pypi.org/project/college-board-scraper/)
 - Only the Firefox browser is supported. You must have geckodriver installed. This will be changed in the future.
 - Very long questions or answers aren't fully captured. This will be changed in the future.
 - The scraper is also quite slow, the performance will be improved in future releases.
