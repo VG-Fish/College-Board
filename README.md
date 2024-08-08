@@ -1,5 +1,6 @@
 # A Python Library to scrape CollegeBoard
 ## Things to Note: 
+- This is the website being scraped: [CollegeBoard SAT Suite Question Bank](https://satsuitequestionbank.collegeboard.org/digital/search)
 - Only the Firefox browser is supported. You must have geckodriver installed. This will be changed in the future.
 - Very long questions or answers aren't fully captured. This will be changed in the future.
 - The scraper is also quite slow, the performance will be improved in future releases.
@@ -47,13 +48,16 @@ valid_reading_and_writing_skills: Dict[str, Set[str]] = {
 }
 valid_math_skills: Dict[str, Set[str]] = {
     "Algebra": {
-        "Linear equations in one variable", "Linear functions", "Linear equations in two variables", "Systems of two linear equations in two variables",
-        "Linear inequalities in one or two variables"
+        "Linear equations in one variable", "Linear functions", "Linear equations in two variables", 
+        "Systems of two linear equations in two variables", "Linear inequalities in one or two variables"
     }, 
-    "Advanced Math": {"Nonlinear functions", "Nonlinear equations in one variable and systems of equations in two variables", "Equivalent expressions"}, 
+    "Advanced Math": {
+        "Nonlinear functions", "Nonlinear equations in one variable and systems of equations in two variables", "Equivalent expressions"
+    }, 
     "Problem-Solving and Data Analysis": {
-        "Ratios, rates, proportional relationships, and units", "Percentages", "One-variable data: Distributions and measures of center and spread",
-        "Two-variable data: Models and scatterplots", "Probability and conditional probability", "Inference from sample statistics and margin of error",
+        "Ratios, rates, proportional relationships, and units", "Percentages", 
+        "One-variable data: Distributions and measures of center and spread", "Two-variable data: Models and scatterplots", 
+        "Probability and conditional probability", "Inference from sample statistics and margin of error", 
         "Evaluating statistical claims: Observational studies and experiments"
     }, 
     "Geometry and Trigonometry": {"Area and volume", "Lines, angles, and triangles", "Right triangles and trigonometry", "Circles"}
