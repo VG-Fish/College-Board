@@ -14,7 +14,7 @@ from io import BytesIO
 from time import sleep
 from os import makedirs
 from os.path import isdir
-from helpers import ScraperAmount
+from .helpers import ScraperAmount
 
 class Scraper():
     # Init Page Options
@@ -288,21 +288,3 @@ class Scraper():
                 EC.element_to_be_clickable((By.ID, "apricot_check_4"))
             )
             exclude_action_questions_checkbox.click()
-
-options: Set[str] = {"Algebra", 'Advanced Math', "Problem-Solving and Data Analysis", "Geometry and Trigonometry"}
-skills: Dict[str, Set[str]] = {
-    "Algebra": {
-        "Linear equations in one variable", "Linear functions", "Linear equations in two variables", "Systems of two linear equations in two variables",
-        "Linear inequalities in one or two variables"
-    }, 
-    "Advanced Math": {"Nonlinear functions", "Nonlinear equations in one variable and systems of equations in two variables", "Equivalent expressions"}, 
-    "Problem-Solving and Data Analysis": {
-        "Ratios, rates, proportional relationships, and units", "Percentages", "One-variable data: Distributions and measures of center and spread",
-        "Two-variable data: Models and scatterplots", "Probability and conditional probability", "Inference from sample statistics and margin of error",
-        "Evaluating statistical claims: Observational studies and experiments"
-    }, 
-    "Geometry and Trigonometry": {"Area and volume", "Lines, angles, and triangles", "Right triangles and trigonometry", "Circles"}
-}
-difficulties = {"Easy", "Medium", "Hard"}
-scraper: Scraper = Scraper(assessment="SAT", test="Math", options=Scraper.valid_math_options, difficulties={"Hard"})
-scraper.scrape(amount=1, save_images=True)
