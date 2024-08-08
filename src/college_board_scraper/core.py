@@ -84,10 +84,9 @@ class Scraper():
             self._check_if_skills_valid(Scraper.valid_math_skills)
 
         self.exclude_active_questions: bool = exclude_active_questions
-        
+
         self._firefox_options: Options = Options()
         self._firefox_options.add_argument("--headless")
-        self.driver: webdriver.Firefox = webdriver.Firefox(options=self._firefox_options)
 
     def _check_if_skills_valid(self: "Scraper", valid_skills: Dict[str, Set[str]]) -> None:
         if not set(self.skills.keys()).issubset(self.options):
@@ -105,6 +104,8 @@ class Scraper():
         self.driver.find_element(By.TAG_NAME, 'body').click()
     
     def scrape(self: "Scraper", amount: int | ScraperAmount, save_images: bool = False) -> None:
+        self.driver: webdriver.Firefox = webdriver.Firefox(options=self._firefox_options)
+
         self._go_to_main_page()
         self._set_up_main_page()
         self._scrape_main_page(amount, save_images)
