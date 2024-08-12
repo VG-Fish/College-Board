@@ -12,7 +12,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngImageFile # imported for type hint
 from io import BytesIO
 from time import sleep
-from os import mkdir
+from os import makedirs
 from os.path import isdir
 from .helpers import ScraperAmount
 
@@ -217,14 +217,14 @@ class Scraper():
                 continue
         
         if save_images:
-            if not isdir("questions"):
-                mkdir("questions")
-            if not isdir("answers"):
-                mkdir("answers")
+            if not isdir("college_board_scraper/questions"):
+                makedirs("college_board_scraper/questions")
+            if not isdir("college_board_scraper/answers"):
+                makedirs("college_board_scraper/answers")
             
             for i, (question, answer) in questions_and_answers:
-                question.save(f"questions/question-{i}.png")
-                answer.save(f"answers/answer-{i}.png")
+                question.save(f"college_board_scraper/questions/question-{i}.png")
+                answer.save(f"college_board_scraper/answers/answer-{i}.png")
         else:
             return questions_and_answers
             
