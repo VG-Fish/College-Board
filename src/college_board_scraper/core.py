@@ -255,6 +255,9 @@ class Scraper():
 
     # Clicks all main page options
     def _set_up_main_page(self: "Scraper") -> None:
+        # Wait for content to load
+        sleep(0.1)
+
         if self.difficulties:
             difficulties_a_dropdown: WebElement = WebDriverWait(self.driver, 2.0).until(
                 EC.element_to_be_clickable((By.ID, "dropdown1"))
