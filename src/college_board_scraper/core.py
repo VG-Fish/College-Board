@@ -103,13 +103,17 @@ class Scraper():
     def _click_away(self: "Scraper") -> None:
         self.driver.find_element(By.TAG_NAME, 'body').click()
     
-    def scrape(self: "Scraper", amount: int | ScraperAmount, save_images: bool = False) -> None:
+    def scrape(self: "Scraper", amount: int | ScraperAmount, save_images: bool = False) -> Optional[List[Tuple[int, Tuple[PngImageFile, PngImageFile]]]]:
         self.driver: webdriver.Firefox = webdriver.Firefox(options=self._firefox_options)
 
         self._go_to_main_page()
         self._set_up_main_page()
-        self._scrape_main_page(amount, save_images)
+        
+        res = self._scrape_main_page(amount, save_images)
         self.driver.quit()
+
+        if res:
+            return res
 
     def _scrape_prompt(self: "Scraper", i: int) -> None:
         div_question_element: WebElement = WebDriverWait(self.driver, 5.0).until(
@@ -225,8 +229,8 @@ class Scraper():
             for i, (question, answer) in questions_and_answers:
                 question.save(f"college_board_scraper/questions/question-{i}.png")
                 answer.save(f"college_board_scraper/answers/answer-{i}.png")
-        else:
-            return questions_and_answers
+            return None
+        return questions_and_answers
             
     # Handles all introductory options
     def _go_to_main_page(self: "Scraper") -> None:
